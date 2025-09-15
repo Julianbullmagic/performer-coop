@@ -41,11 +41,13 @@ Navigate to the "Table Editor" in the left sidebar and create the following tabl
 CREATE TABLE users (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   username TEXT UNIQUE NOT NULL,
-  email TEXT UNIQUE NOT NULL,  -- Added UNIQUE constraint for email
+  email TEXT UNIQUE NOT NULL,
+  password TEXT NOT NULL,
   created_at TIMESTAMP DEFAULT NOW(),
   admin_votes INTEGER DEFAULT 0,
   is_banned BOOLEAN DEFAULT FALSE,
-  email_verified BOOLEAN DEFAULT FALSE  -- Added to track email verification
+  email_verified BOOLEAN DEFAULT FALSE,
+  email_verification_token TEXT
 );
 ```
 
@@ -97,30 +99,14 @@ CREATE TABLE votes (
   user_id UUID REFERENCES users(id),
   suggestion_id UUID REFERENCES suggestions(id),
   referendum_id UUID REFERENCES referenda(id),
-  vote_type TEXT, -- support, oppose, yes, no
-  created_at TIMESTAMP DEFAULT NOW(),
-  CONSTRAINT check_suggestion_or_referendum 
-    CHECK ((suggestion_id IS NOT NULL AND referendum_id IS NULL) OR 
-           (suggestion_id IS NULL AND referendum_id IS NOT NULL))
-);
-```
-
-### Admin Votes Table
-
-```sql
-CREATE TABLE admin_votes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  voter_id UUID REFERENCES users(id),
-  candidate_id UUID REFERENCES users(id),
-  created_at TIMESTAMP DEFAULT NOW(),
-  CONSTRAINT check_voter_candidate_different
-    CHECK (voter_id != candidate_id)
+  vote_type TEXT NOT NULL, -- support, oppose, yes, no
+  created_at TIMESTAMP DEFAULT NOW()
 );
 ```
 
 ### Messages Table
 
-```
+```sql
 CREATE TABLE messages (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   user_id UUID REFERENCES users(id),
@@ -153,28 +139,50 @@ To ensure data security, you should enable Row Level Security on your tables:
 2. Enable RLS for each table
 3. Create policies as needed for your application
 
-Example policies for booking_leads:
+Example policies:
 
 ```sql
 -- Enable RLS
+ALTER TABLE users ENABLE ROW LEVEL SECURITY;
+ALTER TABLE posts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE suggestions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE referenda ENABLE ROW LEVEL SECURITY;
+ALTER TABLE votes ENABLE ROW LEVEL SECURITY;
+ALTER TABLE messages ENABLE ROW LEVEL SECURITY;
 ALTER TABLE booking_leads ENABLE ROW LEVEL SECURITY;
 
--- Users can view all booking leads
-CREATE POLICY "Users can view booking leads" ON booking_leads
+-- Users can view all users
+CREATE POLICY "Users can view all users" ON users
+FOR SELECT USING (true);
+
+-- Users can insert their own posts
+CREATE POLICY "Users can create their own posts" ON posts
+FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Users can view all posts
+CREATE POLICY "Users can view all posts" ON posts
+FOR SELECT USING (true);
+
+-- Users can insert their own suggestions
+CREATE POLICY "Users can create their own suggestions" ON suggestions
+FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+-- Users can view all suggestions
+CREATE POLICY "Users can view all suggestions" ON suggestions
+FOR SELECT USING (true);
+
+-- Users can view all referenda
+CREATE POLICY "Users can view all referenda" ON referenda
 FOR SELECT USING (true);
 
 -- Users can insert their own booking leads
 CREATE POLICY "Users can create their own booking leads" ON booking_leads
 FOR INSERT WITH CHECK (auth.uid() = user_id);
 
--- Users can delete their own booking leads or admins can delete any
+-- Users can delete their own booking leads
 CREATE POLICY "Users can delete their own booking leads" ON booking_leads
-FOR DELETE USING (auth.uid() = user_id OR EXISTS (
-  SELECT 1 FROM users WHERE id = auth.uid() AND is_admin = true
-));
+FOR DELETE USING (auth.uid() = user_id);
 ```
-
-Alternatively, you can use the provided `booking_leads_setup.sql` file which contains all the necessary commands.
 
 ## 6. Testing Your Setup
 
@@ -183,6 +191,7 @@ Alternatively, you can use the provided `booking_leads_setup.sql` file which con
    - `SUPABASE_KEY` - Your Supabase anon key
    - `EMAIL_USER` - Your email account for sending notifications
    - `EMAIL_PASS` - Your email password or app-specific password
+   - `JWT_SECRET` - Your JWT secret for authentication
 
 2. Start your application:
    ```
@@ -191,7 +200,7 @@ Alternatively, you can use the provided `booking_leads_setup.sql` file which con
 
 3. Visit `http://localhost:3000` in your browser
 
-4. Try creating a booking lead and verify it appears in the list
+4. Try registering, verifying your email, and logging in
 
 ## 7. Troubleshooting
 

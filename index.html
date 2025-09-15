@@ -9,16 +9,20 @@
 <body>
     <header>
         <h1>Democratic Social Network</h1>
-        <nav>
-            <ul class="tabs">
-                <li class="tab active" data-tab="news-feed">News Feed</li>
-                <li class="tab" data-tab="suggestions">Suggestions</li>
-                <li class="tab" data-tab="referenda">Referenda</li>
-                <li class="tab" data-tab="elections">Elections</li>
-                <li class="tab" data-tab="booking-leads">Booking Leads</li>
-                <li class="tab" data-tab="register" id="register-tab">Register</li>
-            </ul>
-        </nav>
+        <div class="header-controls">
+            <nav>
+                <ul class="tabs">
+                    <li class="tab active" data-tab="news-feed">News Feed</li>
+                    <li class="tab" data-tab="suggestions">Suggestions</li>
+                    <li class="tab" data-tab="referenda">Referenda</li>
+                    <li class="tab" data-tab="elections">Elections</li>
+                    <li class="tab" data-tab="booking-leads">Booking Leads</li>
+                    <li class="tab" data-tab="login" id="login-tab">Login</li>
+                    <li class="tab" data-tab="register" id="register-tab">Register</li>
+                </ul>
+            </nav>
+            <button id="logout-btn" class="logout-btn" style="display: none;">Logout</button>
+        </div>
     </header>
 
     <main>
@@ -56,6 +60,20 @@
             <h2>Referenda</h2>
             <div class="referenda-container">
                 <!-- Referenda will be loaded here -->
+                <!-- Example of referendum with approval status -->
+                <!-- 
+                <div class="referendum-item">
+                    <h3>Referendum Title</h3>
+                    <p>Description of the referendum...</p>
+                    <div class="referendum-status">
+                        <span class="status approved">Approved</span>
+                    </div>
+                    <div class="referendum-votes">
+                        <span>Yes: 65</span>
+                        <span>No: 25</span>
+                    </div>
+                </div>
+                -->
             </div>
         </section>
 
@@ -76,6 +94,25 @@
                         <!-- Users will be loaded here -->
                     </div>
                 </div>
+            </div>
+        </section>
+
+        <!-- Login Tab -->
+        <section id="login" class="tab-content">
+            <h2>Login</h2>
+            <div class="login-container">
+                <form id="login-form">
+                    <div class="form-group">
+                        <label for="login-email">Email:</label>
+                        <input type="email" id="login-email" name="email" required>
+                    </div>
+                    <div class="form-group">
+                        <label for="login-password">Password:</label>
+                        <input type="password" id="login-password" name="password" required>
+                    </div>
+                    <button type="submit" class="login-btn">Login</button>
+                </form>
+                <div id="login-message"></div>
             </div>
         </section>
 

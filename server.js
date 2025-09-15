@@ -2,12 +2,17 @@ const express = require('express');
 const http = require('http');
 const socketIo = require('socket.io');
 const path = require('path');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const nodemailer = require('nodemailer');
 const { initSupabase } = require('./supabaseClient');
 
 const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
+
+// JWT secret - in production, use environment variable
+const JWT_SECRET = process.env.JWT_SECRET || 'democratic_social_network_secret_key';
 
 // Initialize Supabase
 const supabase = initSupabase();
@@ -32,38 +37,145 @@ app.get('/', (req, res) => {
     res.sendFile(path.join(__dirname, 'index.html'));
 });
 
-// Registration endpoint
+// Registration endpoint with email verification
 app.post('/api/register', async (req, res) => {
     try {
         const { username, email, password } = req.body;
         
-        // In a real implementation with Supabase Auth, you would do:
-        // const { user, error } = await supabase.auth.signUp({
-        //     email,
-        //     password,
-        //     options: {
-        //         data: {
-        //             username
-        //         }
-        //     }
-        // });
+        // Validate input
+        if (!username || !email || !password) {
+            return res.status(400).json({ error: 'Username, email, and password are required' });
+        }
         
-        // For now, we'll just simulate the registration
-        // In a real app, you would store the user in the database
-        console.log(`New user registration: ${username}, ${email}`);
+        // Check if user already exists
+        const { data: existingUsers, error: fetchError } = await supabase
+            .from('users')
+            .select('*')
+            .or(`email.eq.${email},username.eq.${username}`);
         
-        // Check if username or email already exists (in a real app)
-        // For now, we'll just simulate this check
-        const userExists = false; // Replace with actual database check
+        if (fetchError) throw fetchError;
         
-        if (userExists) {
+        if (existingUsers.length > 0) {
             return res.status(400).json({ error: 'Username or email already exists' });
         }
         
-        // Simulate successful registration
-        res.json({ message: 'User registered successfully' });
+        // Hash password
+        const saltRounds = 10;
+        const hashedPassword = await bcrypt.hash(password, saltRounds);
+        
+        // Generate email verification token
+        const emailVerificationToken = jwt.sign({ email }, JWT_SECRET, { expiresIn: '1d' });
+        
+        // Insert user into database
+        const { data: newUser, error: insertError } = await supabase
+            .from('users')
+            .insert([
+                {
+                    username,
+                    email,
+                    password: hashedPassword,
+                    email_verified: false,
+                    email_verification_token: emailVerificationToken
+                }
+            ])
+            .select()
+            .single();
+        
+        if (insertError) throw insertError;
+        
+        // Send verification email
+        await sendVerificationEmail(email, emailVerificationToken);
+        
+        res.status(201).json({ 
+            message: 'User registered successfully. Please check your email for verification.' 
+        });
     } catch (error) {
         console.error('Registration error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Login endpoint
+app.post('/api/login', async (req, res) => {
+    try {
+        const { email, password } = req.body;
+        
+        // Validate input
+        if (!email || !password) {
+            return res.status(400).json({ error: 'Email and password are required' });
+        }
+        
+        // Find user
+        const { data: user, error } = await supabase
+            .from('users')
+            .select('*')
+            .eq('email', email)
+            .single();
+        
+        if (error) throw error;
+        
+        if (!user) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+        
+        // Check if email is verified
+        if (!user.email_verified) {
+            return res.status(401).json({ error: 'Please verify your email before logging in' });
+        }
+        
+        // Verify password
+        const isValidPassword = await bcrypt.compare(password, user.password);
+        if (!isValidPassword) {
+            return res.status(401).json({ error: 'Invalid email or password' });
+        }
+        
+        // Generate JWT token
+        const token = jwt.sign(
+            { id: user.id, username: user.username, email: user.email }, 
+            JWT_SECRET, 
+            { expiresIn: '7d' }
+        );
+        
+        // Remove sensitive data
+        const { password: _, ...userWithoutPassword } = user;
+        
+        res.json({ 
+            user: userWithoutPassword, 
+            token,
+            message: 'Login successful' 
+        });
+    } catch (error) {
+        console.error('Login error:', error);
+        res.status(500).json({ error: 'Internal server error' });
+    }
+});
+
+// Middleware to verify JWT token
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+    
+    if (!token) {
+        return res.status(401).json({ error: 'Access token required' });
+    }
+    
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) {
+            return res.status(403).json({ error: 'Invalid token' });
+        }
+        req.user = user;
+        next();
+    });
+}
+
+// Logout endpoint
+app.post('/api/logout', authenticateToken, async (req, res) => {
+    try {
+        // In a real implementation, you might want to blacklist the token
+        // For now, we'll just send a success response
+        res.json({ message: 'Logout successful' });
+    } catch (error) {
+        console.error('Logout error:', error);
         res.status(500).json({ error: 'Internal server error' });
     }
 });
@@ -149,7 +261,7 @@ app.get('/api/leads', async (req, res) => {
 });
 
 // Create a new booking lead
-app.post('/api/leads', async (req, res) => {
+app.post('/api/leads', authenticateToken, async (req, res) => {
     try {
         const { date, duration, description } = req.body;
         
@@ -158,16 +270,12 @@ app.post('/api/leads', async (req, res) => {
             return res.status(400).json({ error: 'Date, duration, and description are required' });
         }
         
-        // In a real implementation, user ID would come from authentication
-        // For now, we'll use a mock user ID
-        const userId = '00000000-0000-0000-0000-000000000000'; // Mock user ID
-        
         // Insert lead into database
         const { data: newLead, error } = await supabase
             .from('booking_leads')
             .insert([
                 {
-                    user_id: userId,
+                    user_id: req.user.id,
                     date,
                     duration,
                     description
@@ -189,13 +297,25 @@ app.post('/api/leads', async (req, res) => {
 });
 
 // Delete a booking lead
-app.delete('/api/leads/:id', async (req, res) => {
+app.delete('/api/leads/:id', authenticateToken, async (req, res) => {
     try {
         const leadId = req.params.id;
         
-        // In a real implementation, you would:
-        // 1. Check if user is admin or owner of the lead
-        // 2. Delete from database
+        // Check if user is admin or owner of the lead
+        const { data: lead, error: fetchError } = await supabase
+            .from('booking_leads')
+            .select('user_id')
+            .eq('id', leadId)
+            .single();
+        
+        if (fetchError) throw fetchError;
+        
+        // In a real implementation, also check if user is admin
+        if (lead.user_id !== req.user.id) {
+            return res.status(403).json({ error: 'Not authorized to delete this lead' });
+        }
+        
+        // Delete from database
         const { error } = await supabase
             .from('booking_leads')
             .delete()
@@ -245,26 +365,200 @@ Log in to the Democratic Social Network to view more details.`
     }
 }
 
-// Add periodic cleanup task for old leads (more than 2 weeks old)
+// Function to send email verification email
+async function sendVerificationEmail(email, token) {
+    try {
+        const verificationUrl = `${process.env.BASE_URL || 'http://localhost:3000'}/api/verify-email?token=${token}`;
+        
+        const mailOptions = {
+            from: process.env.EMAIL_USER || 'noreply@democratic-social-network.com',
+            to: email,
+            subject: 'Email Verification - Democratic Social Network',
+            html: `
+                <h2>Email Verification</h2>
+                <p>Thank you for registering with Democratic Social Network.</p>
+                <p>Please click the link below to verify your email address:</p>
+                <a href="${verificationUrl}">Verify Email</a>
+                <p>This link will expire in 24 hours.</p>
+            `
+        };
+        
+        // In a real implementation, send the email
+        // For now, we'll just log it
+        console.log('Would send verification email:', mailOptions);
+        
+        // Uncomment the following line in a real implementation:
+        // await transporter.sendMail(mailOptions);
+    } catch (error) {
+        console.error('Error sending verification email:', error);
+    }
+}
+
+// Function to send email notifications when a suggestion is approved for referendum
+async function sendReferendumApprovalNotification(suggestion) {
+    try {
+        // Get all users to send notifications to
+        const { data: users, error } = await supabase
+            .from('users')
+            .select('email');
+        
+        if (error) throw error;
+        
+        const mailOptions = {
+            from: process.env.EMAIL_USER || 'noreply@democratic-social-network.com',
+            to: users.map(user => user.email).join(','),
+            subject: 'New Referendum Approved - Democratic Social Network',
+            html: `
+                <h2>New Referendum Approved</h2>
+                <p>A suggestion has reached the required quorum and has been approved for a referendum:</p>
+                <h3>${suggestion.title}</h3>
+                <p>${suggestion.description}</p>
+                <p>Log in to the Democratic Social Network to vote on this referendum.</p>
+            `
+        };
+        
+        // In a real implementation, send the email
+        // For now, we'll just log it
+        console.log('Would send referendum approval notification:', mailOptions);
+        
+        // Uncomment the following line in a real implementation:
+        // await transporter.sendMail(mailOptions);
+    } catch (error) {
+        console.error('Error sending referendum approval notification:', error);
+    }
+}
+
+// Function to send email notifications when a referendum is approved
+async function sendReferendumPassedNotification(referendum) {
+    try {
+        // Get all users to send notifications to
+        const { data: users, error } = await supabase
+            .from('users')
+            .select('email');
+        
+        if (error) throw error;
+        
+        const mailOptions = {
+            from: process.env.EMAIL_USER || 'noreply@democratic-social-network.com',
+            to: users.map(user => user.email).join(','),
+            subject: 'Referendum Approved - Democratic Social Network',
+            html: `
+                <h2>Referendum Approved</h2>
+                <p>A referendum has been approved with a two-thirds majority:</p>
+                <h3>${referendum.title}</h3>
+                <p>${referendum.description}</p>
+                <p>Yes votes: ${referendum.yes_votes}</p>
+                <p>No votes: ${referendum.no_votes}</p>
+            `
+        };
+        
+        // In a real implementation, send the email
+        // For now, we'll just log it
+        console.log('Would send referendum passed notification:', mailOptions);
+        
+        // Uncomment the following line in a real implementation:
+        // await transporter.sendMail(mailOptions);
+    } catch (error) {
+        console.error('Error sending referendum passed notification:', error);
+    }
+}
+
+// Add periodic cleanup task for old referendums (more than 2 weeks old)
 setInterval(async () => {
     try {
         // Calculate the date 2 weeks ago
         const twoWeeksAgo = new Date();
         twoWeeksAgo.setDate(twoWeeksAgo.getDate() - 14);
         
-        // Delete leads older than 2 weeks
-        const { error } = await supabase
+        // Find referendums older than 2 weeks that haven't ended
+        const { data: oldReferendums, error: fetchError } = await supabase
+            .from('referenda')
+            .select('*')
+            .lt('created_at', twoWeeksAgo.toISOString())
+            .is('ended_at', null);
+        
+        if (fetchError) throw fetchError;
+        
+        // Delete old referendums
+        if (oldReferendums.length > 0) {
+            const { error: deleteError } = await supabase
+                .from('referenda')
+                .delete()
+                .in('id', oldReferendums.map(r => r.id));
+            
+            if (deleteError) throw deleteError;
+            
+            console.log(`Deleted ${oldReferendums.length} old referendums`);
+        }
+        
+        // Also clean up old leads (existing code)
+        const { error: leadError } = await supabase
             .from('booking_leads')
             .delete()
             .lt('date', twoWeeksAgo.toISOString().split('T')[0]);
         
-        if (error) throw error;
+        if (leadError) throw leadError;
         
         console.log('Old leads cleanup completed');
     } catch (error) {
-        console.error('Error during lead cleanup:', error);
+        console.error('Error during cleanup:', error);
     }
 }, 24 * 60 * 60 * 1000); // Run once per day
+
+// Check for referendums that should be approved (every hour)
+setInterval(async () => {
+    try {
+        // Find active referendums
+        const { data: referendums, error } = await supabase
+            .from('referenda')
+            .select('*')
+            .eq('status', 'active');
+        
+        if (error) throw error;
+        
+        for (const referendum of referendums) {
+            // Check if referendum has been active for at least 24 hours
+            const createdTime = new Date(referendum.created_at);
+            const now = new Date();
+            const hoursDifference = (now - createdTime) / (1000 * 60 * 60);
+            
+            if (hoursDifference >= 24) {
+                // Calculate total votes
+                const totalVotes = referendum.yes_votes + referendum.no_votes;
+                
+                // Check if there's a two-thirds majority
+                if (referendum.yes_votes >= totalVotes * 2/3) {
+                    // Update referendum as passed
+                    const { error: updateError } = await supabase
+                        .from('referenda')
+                        .update({ 
+                            status: 'passed',
+                            ended_at: new Date().toISOString()
+                        })
+                        .eq('id', referendum.id);
+                    
+                    if (updateError) throw updateError;
+                    
+                    // Send notification that referendum passed
+                    await sendReferendumPassedNotification(referendum);
+                } else if (referendum.no_votes >= totalVotes * 2/3) {
+                    // Update referendum as failed
+                    const { error: updateError } = await supabase
+                        .from('referenda')
+                        .update({ 
+                            status: 'failed',
+                            ended_at: new Date().toISOString()
+                        })
+                        .eq('id', referendum.id);
+                    
+                    if (updateError) throw updateError;
+                }
+            }
+        }
+    } catch (error) {
+        console.error('Error during referendum check:', error);
+    }
+}, 60 * 60 * 1000); // Run every hour
 
 // Start the server
 const PORT = process.env.PORT || 3000;
