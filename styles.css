@@ -1,0 +1,454 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: Arial, sans-serif;
+    background-color: #f5f5f5;
+    color: #333;
+    padding-bottom: 350px; /* Space for the chat bar */
+}
+
+header {
+    background-color: #2c3e50;
+    color: white;
+    padding: 1rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 1000;
+}
+
+header h1 {
+    text-align: center;
+    margin-bottom: 1rem;
+}
+
+.tabs {
+    display: flex;
+    list-style: none;
+    border-bottom: 1px solid #34495e;
+}
+
+.tab {
+    padding: 0.75rem 1.5rem;
+    cursor: pointer;
+    background-color: #34495e;
+    margin-right: 0.25rem;
+    transition: background-color 0.3s;
+}
+
+.tab.active {
+    background-color: #3498db;
+}
+
+.tab:hover {
+    background-color: #4aa3df;
+}
+
+main {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 7rem 1rem 1rem; /* Extra top padding for fixed header */
+}
+
+.tab-content {
+    display: none;
+}
+
+.tab-content.active {
+    display: block;
+}
+
+h2 {
+    margin-bottom: 1rem;
+    color: #2c3e50;
+}
+
+/* News Feed Styles */
+.news-feed-container, .suggestions-container, .referenda-container, .register-container, .elections-container {
+    background-color: white;
+    border-radius: 8px;
+    padding: 1.5rem;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.post-form, .suggestion-form {
+    margin-bottom: 2rem;
+    padding-bottom: 1.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+.post-form textarea, .suggestion-form textarea {
+    width: 100%;
+    min-height: 100px;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    resize: vertical;
+}
+
+.suggestion-form input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+}
+
+button {
+    background-color: #3498db;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+button:hover {
+    background-color: #2980b9;
+}
+
+.delete-btn, .ban-btn {
+    background-color: #e74c3c;
+    padding: 0.25rem 0.5rem;
+    font-size: 0.8rem;
+    float: right;
+}
+
+.delete-btn:hover, .ban-btn:hover {
+    background-color: #c0392b;
+}
+
+.news-post, .suggestion-item, .referendum-item {
+    padding: 1rem;
+    border: 1px solid #eee;
+    border-radius: 4px;
+    margin-bottom: 1rem;
+    background-color: #fafafa;
+}
+
+.news-post:hover, .suggestion-item:hover, .referendum-item:hover {
+    background-color: #f0f8ff;
+}
+
+.post-header, .suggestion-header, .referendum-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+}
+
+/* Suggestions Styles */
+.suggestions-list {
+    margin-top: 1rem;
+}
+
+.suggestion-title {
+    font-weight: bold;
+    font-size: 1.2rem;
+    margin-bottom: 0.5rem;
+}
+
+.vote-count {
+    display: inline-block;
+    margin-right: 1rem;
+    padding: 0.25rem 0.5rem;
+    background-color: #ecf0f1;
+    border-radius: 4px;
+}
+
+.support-btn, .oppose-btn {
+    padding: 0.25rem 0.75rem;
+    margin-right: 0.5rem;
+    font-size: 0.9rem;
+}
+
+.support-btn {
+    background-color: #2ecc71;
+}
+
+.oppose-btn {
+    background-color: #e74c3c;
+}
+
+/* Referenda Styles */
+.referendum-status {
+    display: inline-block;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+}
+
+.status-active {
+    background-color: #2ecc71;
+    color: white;
+}
+
+.status-passed {
+    background-color: #3498db;
+    color: white;
+}
+
+.status-failed {
+    background-color: #95a5a6;
+    color: white;
+}
+
+.vote-buttons {
+    margin-top: 1rem;
+}
+
+.vote-buttons button {
+    margin-right: 0.5rem;
+}
+
+.vote-percentage {
+    margin-top: 0.5rem;
+    font-size: 0.9rem;
+    color: #7f8c8d;
+}
+
+/* Voter Lists */
+.voters-list {
+    margin-top: 0.5rem;
+    padding: 0.5rem;
+    background-color: #f8f9fa;
+    border-radius: 4px;
+    border: 1px solid #e9ecef;
+}
+
+.voters-list small {
+    color: #6c757d;
+}
+
+/* Registration Styles */
+.form-group {
+    margin-bottom: 1rem;
+}
+
+.form-group label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+}
+
+.form-group input {
+    width: 100%;
+    padding: 0.75rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+}
+
+.register-btn {
+    width: 100%;
+    padding: 1rem;
+    font-size: 1.1rem;
+    background-color: #27ae60;
+}
+
+.register-btn:hover {
+    background-color: #219653;
+}
+
+#register-message {
+    margin-top: 1rem;
+    padding: 1rem;
+    border-radius: 4px;
+    text-align: center;
+}
+
+.message-success {
+    background-color: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+}
+
+.message-error {
+    background-color: #f8d7da;
+    color: #721c24;
+    border: 1px solid #f5c6cb;
+}
+
+/* Elections Styles */
+.elections-container {
+    display: flex;
+    gap: 2rem;
+}
+
+.admin-info, .users-list {
+    flex: 1;
+}
+
+.current-admins {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.users-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+    gap: 1rem;
+}
+
+.user-card, .admin-card {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1rem;
+    background: white;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+}
+
+.user-card button {
+    margin-top: 0.5rem;
+    width: 100%;
+}
+
+/* Booking Leads Styles */
+.booking-leads-container {
+    display: flex;
+    flex-direction: column;
+    gap: 2rem;
+}
+
+.lead-form {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid #ddd;
+}
+
+.leads-list {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+    border: 1px solid #ddd;
+}
+
+.lead-form .form-group {
+    margin-bottom: 1rem;
+}
+
+.lead-form label {
+    display: block;
+    margin-bottom: 0.5rem;
+    font-weight: bold;
+}
+
+.lead-form input,
+.lead-form textarea {
+    width: 100%;
+    padding: 0.5rem;
+    border: 1px solid #ddd;
+    border-radius: 4px;
+    font-family: inherit;
+    font-size: 1rem;
+}
+
+.lead-form textarea {
+    min-height: 100px;
+    resize: vertical;
+}
+
+.submit-lead-btn {
+    background: #007bff;
+    color: white;
+    border: none;
+    padding: 0.75rem 1.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 1rem;
+}
+
+.submit-lead-btn:hover {
+    background: #0056b3;
+}
+
+.lead-item {
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #f8f9fa;
+}
+
+.lead-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 0.5rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid #eee;
+}
+
+.lead-date {
+    font-weight: bold;
+    color: #007bff;
+}
+
+.lead-duration {
+    color: #6c757d;
+}
+
+.lead-description {
+    margin-bottom: 1rem;
+}
+
+.lead-actions {
+    display: flex;
+    justify-content: flex-end;
+    gap: 0.5rem;
+}
+
+.delete-lead-btn {
+    background: #dc3545;
+    color: white;
+    border: none;
+    padding: 0.25rem 0.5rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 0.875rem;
+}
+
+.delete-lead-btn:hover {
+    background: #c82333;
+}
+
+.delete-lead-btn:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+.lead-author {
+    font-style: italic;
+    color: #6c757d;
+    font-size: 0.875rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+    .chat-bar {
+        width: calc(100% - 20px);
+        right: 10px;
+    }
+    
+    main {
+        padding: 7rem 10px 1rem;
+    }
+    
+    .users-container {
+        grid-template-columns: 1fr;
+    }
+    
+    .current-admins {
+        flex-direction: column;
+    }
+}
