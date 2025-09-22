@@ -6,24 +6,110 @@ const SUPABASE_CONFIG = {
 };
 
 // Function to initialize Supabase client
-function initSupabase() {
+async function initSupabase() {
     try {
-        // Try to import and initialize the Supabase client
-        const { createClient } = require('@supabase/supabase-js');
-        return createClient(SUPABASE_CONFIG.url, SUPABASE_CONFIG.key);
+        // Try to load the library (ESM-first, then CJS fallback)
+        let createClient;
+        try {
+            ({ createClient } = await import('@supabase/supabase-js'));
+        } catch (e1) {
+            try {
+                ({ createClient } = require('@supabase/supabase-js'));
+            } catch (e2) {
+                console.warn('Supabase import failed:', e1?.message || e1);
+                console.warn('CJS require fallback failed:', e2?.message || e2);
+                throw e1;
+            }
+        }
+
+        // Accept common env var aliases and trim any accidental whitespace
+        const pickFirst = (pairs) => {
+            for (const [name, val] of pairs) {
+                if (val !== undefined && val !== null && String(val).trim() !== '') {
+                    return { name, value: String(val).trim() };
+                }
+            }
+            return { name: undefined, value: undefined };
+        };
+
+        const urlPick = pickFirst([
+            ['SUPABASE_URL', process.env.SUPABASE_URL],
+            ['NEXT_PUBLIC_SUPABASE_URL', process.env.NEXT_PUBLIC_SUPABASE_URL],
+            ['VITE_SUPABASE_URL', process.env.VITE_SUPABASE_URL],
+            ['SUPABASE_CONFIG.url', SUPABASE_CONFIG.url]
+        ]);
+
+        const keyPick = pickFirst([
+            ['SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY],
+            ['SUPABASE_KEY', process.env.SUPABASE_KEY],
+            ['SUPABASE_ANON_KEY', process.env.SUPABASE_ANON_KEY],
+            ['NEXT_PUBLIC_SUPABASE_ANON_KEY', process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY],
+            ['VITE_SUPABASE_ANON_KEY', process.env.VITE_SUPABASE_ANON_KEY],
+            ['SUPABASE_CONFIG.key', SUPABASE_CONFIG.key]
+        ]);
+
+        const url = urlPick.value;
+        const key = keyPick.value;
+
+        // Log non-sensitive diagnostics
+        let urlHost = 'invalid';
+        try { urlHost = url ? new URL(url).host : 'missing'; } catch {}
+        const keyPreview = key ? `${String(key).slice(0,6)}... (len:${String(key).length})` : 'missing';
+        console.log('[Supabase] Env detection:', {
+            node: process.version,
+            urlVar: urlPick.name,
+            urlHost,
+            keyVar: keyPick.name,
+            keyPreview
+        });
+
+        if (!url || !key || /YOUR_SUPABASE_URL|YOUR_SUPABASE_KEY/.test(`${url}${key}`)) {
+            console.warn('Supabase credentials missing or placeholder values detected.');
+            throw new Error('MissingSupabaseEnv');
+        }
+
+        const client = createClient(url, key);
+        // Mark as real for downstream logs
+        Object.defineProperty(client, '__mock', { value: false });
+        console.log('[Supabase] Client initialized successfully.');
+        return client;
     } catch (error) {
         console.warn('Supabase client could not be initialized. Using mock implementation.');
-        console.warn('Make sure to install @supabase/supabase-js and set your credentials.');
+        console.warn('Make sure @supabase/supabase-js is installed and credentials are set.');
+        console.warn('Init reason:', error?.message || error);
         
-        // Return a mock client if Supabase is not available
-        return {
-            from: (table) => ({
-                select: () => Promise.resolve({ data: [], error: null }),
-                insert: (data) => Promise.resolve({ data: [data], error: null }),
-                update: (data) => Promise.resolve({ data: [data], error: null }),
-                delete: () => Promise.resolve({ data: [], error: null })
-            })
+        // Return a chain-friendly and await-able mock client if Supabase is not available
+        const createBuilder = (_table) => {
+            const state = { mode: 'list', lastInserted: null };
+            const builder = {
+                // Starters
+                select: () => builder,
+                insert: (data) => { state.lastInserted = Array.isArray(data) ? data[0] : data; return builder; },
+                update: () => builder,
+                delete: () => builder,
+                // Filters/clauses (all chainable)
+                or: () => builder,
+                eq: () => builder,
+                lt: () => builder,
+                is: () => builder,
+                in: () => builder,
+                order: () => builder,
+                // Finalizer
+                single: () => { state.mode = 'single'; return builder; },
+                // Thenable so `await` works at any point
+                then: (resolve) => resolve({ data: state.mode === 'single' ? (state.lastInserted || null) : [], error: null }),
+                catch: () => builder,
+                finally: () => {}
+            };
+            return builder;
         };
+
+        const mock = {
+            from: (table) => createBuilder(table)
+        };
+        Object.defineProperty(mock, '__mock', { value: true });
+        console.log('[Supabase] Mock client active.');
+        return mock;
     }
 }
 
