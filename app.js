@@ -186,6 +186,8 @@ document.addEventListener('DOMContentLoaded', function() {
             e.preventDefault();
             
             const date = document.getElementById('lead-date').value;
+            const email = (document.getElementById('lead-email')?.value || '').trim();
+            const phone = (document.getElementById('lead-phone')?.value || '').trim();
             const duration = document.getElementById('lead-duration').value;
             const description = document.getElementById('lead-description').value;
             
@@ -196,7 +198,7 @@ document.addEventListener('DOMContentLoaded', function() {
                         'Content-Type': 'application/json',
                         'Authorization': `Bearer ${authToken}`
                     },
-                    body: JSON.stringify({ date, duration, description })
+                    body: JSON.stringify({ date, email, phone, duration, description })
                 });
                 
                 if (response.ok) {

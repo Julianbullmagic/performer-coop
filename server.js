@@ -887,7 +887,7 @@ app.get('/api/leads', async (req, res) => {
 // Create a new booking lead
 app.post('/api/leads', authenticateToken, async (req, res) => {
     try {
-        const { date, duration, description } = req.body;
+        const { date, email, phone, duration, description } = req.body;
         
         // Validate input
         if (!date || !duration || !description) {
@@ -925,6 +925,8 @@ app.post('/api/leads', authenticateToken, async (req, res) => {
                 {
                     user_id: req.user.id,
                     date: normalizedDate,
+                    contact_email: email || null,
+                    contact_phone: phone || null,
                     duration,
                     description
                 }
